@@ -15,6 +15,7 @@ from app.market.yahoo import YahooClient
 from app.news.aggregator import NewsAggregator, load_sources
 from app.news.router import router as news_router
 from app.news.store import NewsStore
+from app.news.symbols import SymbolDetector
 from app.realtime.hub import Hub
 from app.realtime.router import router as ws_router
 from app.watchlist.router import router as watchlist_router
@@ -34,6 +35,7 @@ async def lifespan(app: FastAPI):
         await app.state.hub.broadcast("news", item.model_dump(mode="json"))
 
     app.state.news_store.subscribe(push_news)
+    app.state.detector = SymbolDetector()
 
     app.state.quotes = QuoteStore()
 
@@ -47,6 +49,13 @@ async def lifespan(app: FastAPI):
                    Validator(app.state.http, app.state.yahoo))
     app.state.watchlist = wl
     app.state.watchlist_snapshot = wl.snapshot
+
+    def teach_detector(items):
+        for i in items:
+            app.state.detector.add(i.symbol, i.type, wl.names.get(i.symbol, i.symbol))
+
+    teach_detector(wl.items)
+    wl.on_change(teach_detector)
     app.state.binance = None
     app.state.stocks = None
     if settings.market_streaming:
@@ -61,7 +70,7 @@ async def lifespan(app: FastAPI):
 
         wl.on_change(resubscribe)
     if settings.news_polling:
-        agg = NewsAggregator(load_sources(settings.news_sources_file), app.state.news_store)
+        agg = NewsAggregator(load_sources(settings.news_sources_file), app.state.news_store, detector=app.state.detector)
         app.state.news_aggregator = agg
         await agg.start()
     yield

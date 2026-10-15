@@ -3,14 +3,23 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 
+class Asset(BaseModel):
+    symbol: str
+    type: str  # crypto | stock
+    name: str
+
+
 class NewsItem(BaseModel):
     id: str
     title: str
     source: str
+    source_id: str = ""
     url: str
     published_at: datetime
     summary: str | None = None
     symbols: list[str] = Field(default_factory=list)
+    assets: list[Asset] = Field(default_factory=list)
+    asset_types: list[str] = Field(default_factory=list)
 
 
 class SourceConfig(BaseModel):
