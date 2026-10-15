@@ -53,6 +53,10 @@ Las acciones salen del endpoint público de gráficos de Yahoo Finance (`query1.
 - **Lista de seguimiento:** por defecto BTC, ETH, SOL, AAPL, MSFT, NVDA, TSLA y SAN.MC, configurable con `ATLAS_DEFAULT_WATCHLIST`. Se edita con `POST /api/watchlist` y `DELETE /api/watchlist/{symbol}`, se valida que el símbolo exista y se guarda en `ATLAS_WATCHLIST_FILE`. En un hosting gratuito ese archivo puede perderse al reiniciar, y entonces vuelve la lista por defecto.
 - Al cambiar la lista, Binance y el sondeo de acciones se actualizan solos, sin reiniciar el servidor.
 
+## Velas (gráfico)
+
+`GET /api/candles/{símbolo}?interval=1m|1h|1d&limit=300` devuelve velas OHLC listas para Lightweight Charts. Cripto usa el endpoint público de klines de Binance (`data-api.binance.vision`, sin clave) y acciones el mismo endpoint de gráficos de Yahoo que las cotizaciones, con sus mismas limitaciones. El histórico se cachea en memoria y la vela en curso se actualiza en vivo con cada cotización y se empuja por el websocket a quien esté suscrito (`subscribe_candles`). Coste: cero.
+
 ## Secretos
 
 Este repositorio es público. Toda la configuración va por variables de entorno (ver `.env.example`); nunca se suben claves.

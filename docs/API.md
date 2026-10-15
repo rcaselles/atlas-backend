@@ -76,9 +76,14 @@ Devuelve la lista completa. `404` si no estaba.
   ]
 }
 ```
+- Funciona para cualquier símbolo de la lista de seguimiento: cripto con datos de Binance y acciones con datos de Yahoo Finance (con retraso). `time` es el inicio de la vela en segundos Unix (UTC). Las velas vienen ordenadas de la más antigua a la más reciente, sin tiempos repetidos.
+- `limit` va de 1 a 1000 (por defecto 300). En acciones puede haber menos velas de las pedidas: Yahoo da unos 5 días de velas de 1m, 3 meses de 1h y 2 años de 1d, y solo hay velas en horario de mercado.
+- Errores: `404 not_found` si el símbolo no está en la lista de seguimiento, `422 invalid_request` si el `interval` o el `limit` no son válidos, y `502 upstream_error` si Binance o Yahoo no responden.
+- El backend guarda el histórico en caché (30 s para 1m, 5 min para 1h, 30 min para 1d), así que se puede pedir sin miedo al cambiar de intervalo.
+- Para el tiempo real: primero se pide el histórico con este endpoint y después se envía `subscribe_candles` por el websocket. Cada mensaje `candle` trae la vela en curso actualizada (para `series.update()`) o, al cambiar de periodo, la vela nueva. En acciones llega una actualización por minuto, al ritmo de las cotizaciones.
 
 ### Errores
-Siempre `{ "error": { "code": "not_found", "message": "texto legible" } }` con el código HTTP correspondiente.
+Siempre `{ "error": { "code": "not_found", "message": "texto legible" } }` con el código HTTP correspondiente. Códigos posibles: `not_found`, `invalid_request`, `invalid_cursor`, `conflict`, `upstream_error`.
 
 ## Websocket `GET /ws`
 

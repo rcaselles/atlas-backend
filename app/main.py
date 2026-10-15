@@ -9,6 +9,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from app import errors
 from app.config import settings
 from app.market.binance import BinanceStream
+from app.market.candles import CandleService
+from app.market.candles_router import router as candles_router
 from app.market.quotes import QuoteStore
 from app.market.stocks import StockPoller
 from app.market.yahoo import YahooClient
@@ -47,6 +49,20 @@ async def lifespan(app: FastAPI):
                    Validator(app.state.http, app.state.yahoo))
     app.state.watchlist = wl
     app.state.watchlist_snapshot = wl.snapshot
+
+    def type_of(symbol):
+        return next((i.type for i in wl.items if i.symbol == symbol), None)
+
+    app.state.candles = CandleService(app.state.http, app.state.yahoo, type_of)
+
+    async def push_candles(quote):
+        hub = app.state.hub
+        for interval in hub.candle_intervals(quote.symbol):
+            candle = app.state.candles.apply_quote(quote, interval)
+            if candle:
+                await hub.broadcast_candle(quote.symbol, interval, candle.model_dump())
+
+    app.state.quotes.subscribe_all(push_candles)
     app.state.binance = None
     app.state.stocks = None
     if settings.market_streaming:
@@ -88,6 +104,7 @@ app.add_middleware(
 app.include_router(news_router)
 app.include_router(ws_router)
 app.include_router(watchlist_router)
+app.include_router(candles_router)
 
 
 @app.get("/health")

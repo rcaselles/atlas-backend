@@ -35,11 +35,16 @@ class QuoteStore:
         self._quotes: dict[str, Quote] = {}
         self._last_push: dict[str, float] = {}
         self._listeners: list[Listener] = []
+        self._raw_listeners: list[Listener] = []
         self._gap = min_gap
         self._clock = clock
 
     def subscribe(self, listener: Listener) -> None:
         self._listeners.append(listener)
+
+    def subscribe_all(self, listener: Listener) -> None:
+        """Like subscribe, but called on every update, without throttling (for candle building)."""
+        self._raw_listeners.append(listener)
 
     def get(self, symbol: str) -> Quote | None:
         return self._quotes.get(symbol.upper())
@@ -53,6 +58,8 @@ class QuoteStore:
 
     async def update(self, quote: Quote) -> bool:
         self._quotes[quote.symbol] = quote
+        if self._raw_listeners:
+            await asyncio.gather(*(l(quote) for l in list(self._raw_listeners)), return_exceptions=True)
         now = self._clock()
         if now - self._last_push.get(quote.symbol, float("-inf")) < self._gap:
             return False

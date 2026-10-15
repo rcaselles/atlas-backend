@@ -30,6 +30,10 @@ class Hub:
         if ws in self._clients:
             self._clients[ws].add((symbol.upper(), interval))
 
+    def candle_intervals(self, symbol: str) -> set[str]:
+        symbol = symbol.upper()
+        return {iv for subs in self._clients.values() for s, iv in subs if s == symbol}
+
     def unsubscribe_candles(self, ws: WebSocket, symbol: str, interval: str) -> None:
         if ws in self._clients:
             self._clients[ws].discard((symbol.upper(), interval))
