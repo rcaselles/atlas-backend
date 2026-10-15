@@ -5,3 +5,4 @@ httpx==0.28.1
 feedparser==6.0.14
 beautifulsoup4==4.15.0
 PyYAML==6.0.3
+websockets==17.2

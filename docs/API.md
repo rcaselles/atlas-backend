@@ -83,7 +83,7 @@ Siempre `{ "error": { "code": "not_found", "message": "texto legible" } }` con e
 
 El servidor empuja mensajes JSON con la forma `{ "type": "...", "data": { ... } }`.
 
-Estado actual: `snapshot`, `news`, `candle`, `ping` y las suscripciones ya funcionan. Los mensajes `price` llegarán con la tarea 3, y hasta la tarea 4 la `watchlist` del snapshot viene vacía.
+Estado actual: `snapshot`, `news`, `price` (cripto), `candle`, `ping` y las suscripciones ya funcionan. Hasta la tarea 4, la `watchlist` del snapshot contiene las cripto de `ATLAS_CRYPTO_SYMBOLS` que ya tengan precio; las acciones llegarán con esa tarea.
 
 Al conectar, el servidor envía un `snapshot` con la lista de seguimiento y las últimas noticias:
 ```json
