@@ -31,6 +31,13 @@ def _entry_time(entry) -> datetime | None:
     return None
 
 
+def _tag(item: NewsItem, source: SourceConfig, detector: SymbolDetector) -> NewsItem:
+    item.source_id = source.id
+    item.assets = detector.assets(item.symbols)
+    item.asset_types = sorted({a.type for a in item.assets})
+    return item
+
+
 def parse_rss(content: bytes | str, source: SourceConfig, detector: SymbolDetector) -> list[NewsItem]:
     feed = feedparser.parse(content)
     if feed.bozo and not feed.entries:
@@ -42,7 +49,7 @@ def parse_rss(content: bytes | str, source: SourceConfig, detector: SymbolDetect
         if not title or not link:
             continue
         summary = clean_text(e.get("summary"), max_len=400)
-        items.append(
+        items.append(_tag(
             NewsItem(
                 id=item_id(link),
                 title=title,
@@ -51,7 +58,7 @@ def parse_rss(content: bytes | str, source: SourceConfig, detector: SymbolDetect
                 published_at=to_utc(_entry_time(e)),
                 summary=summary,
                 symbols=detector.detect(title, summary),
-            )
+            ), source, detector)
         )
     return items
 
@@ -78,7 +85,7 @@ def parse_html(content: str, source: SourceConfig, detector: SymbolDetector) -> 
         summary = None
         if source.summary_selector and (s := node.select_one(source.summary_selector)):
             summary = clean_text(s.get_text(" "), max_len=400)
-        items.append(
+        items.append(_tag(
             NewsItem(
                 id=item_id(link),
                 title=title,
@@ -87,7 +94,7 @@ def parse_html(content: str, source: SourceConfig, detector: SymbolDetector) -> 
                 published_at=to_utc(published),
                 summary=summary,
                 symbols=detector.detect(title, summary),
-            )
+            ), source, detector)
         )
     return items
 
