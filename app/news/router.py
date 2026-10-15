@@ -1,3 +1,5 @@
+from typing import Literal
+
 from fastapi import APIRouter, Query, Request
 
 from app.errors import ApiError
@@ -18,8 +20,10 @@ def list_news(
     limit: int = Query(20, ge=1, le=100),
     cursor: str | None = None,
     symbol: str | None = None,
+    type: Literal["crypto", "stock"] | None = None,
+    source: str | None = None,
 ):
-    result = request.app.state.news_store.page(limit=limit, cursor=cursor, symbol=symbol)
+    result = request.app.state.news_store.page(limit=limit, cursor=cursor, symbol=symbol, type_=type, source=source)
     if result is None:
         raise ApiError(400, "cursor no válido o caducado", "invalid_cursor")
     items, next_cursor = result

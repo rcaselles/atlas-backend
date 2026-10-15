@@ -49,10 +49,15 @@ class NewsStore:
     def _sorted(self) -> list[NewsItem]:
         return sorted(self._items.values(), key=lambda i: (i.published_at, i.id), reverse=True)
 
-    def page(self, limit: int = 20, cursor: str | None = None, symbol: str | None = None):
+    def page(self, limit: int = 20, cursor: str | None = None, symbol: str | None = None,
+             type_: str | None = None, source: str | None = None):
         items = self._sorted()
         if symbol:
             items = [i for i in items if symbol.upper() in i.symbols]
+        if type_:
+            items = [i for i in items if type_ in i.asset_types]
+        if source:
+            items = [i for i in items if source.lower() in (i.source_id.lower(), i.source.lower())]
         start = 0
         if cursor:
             idx = next((n for n, i in enumerate(items) if i.id == cursor), None)
