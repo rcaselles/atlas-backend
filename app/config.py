@@ -13,12 +13,13 @@ class Settings(BaseSettings):
     news_max_items: int = 1000
     # Market data
     market_streaming: bool = True
-    crypto_symbols: str = "BTCUSDT,ETHUSDT,SOLUSDT"
+    # Default watchlist as SYMBOL:type pairs, used until someone edits it
+    default_watchlist: str = (
+        "BTCUSDT:crypto,ETHUSDT:crypto,SOLUSDT:crypto,AAPL:stock,MSFT:stock,NVDA:stock,TSLA:stock,SAN.MC:stock"
+    )
+    watchlist_file: str = "data/watchlist.json"
+    stock_poll_seconds: float = 60.0
     binance_ws_urls: str = "wss://data-stream.binance.vision,wss://stream.binance.com:9443"
-
-    @property
-    def crypto_symbol_list(self) -> list[str]:
-        return [s.strip().upper() for s in self.crypto_symbols.split(",") if s.strip()]
 
     @property
     def binance_url_list(self) -> list[str]:
