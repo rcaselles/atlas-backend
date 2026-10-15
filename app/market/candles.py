@@ -1,4 +1,6 @@
 """OHLC candle history (REST) and live candle updates built from the quote stream."""
+import asyncio
+import logging
 import time
 from typing import Literal
 
@@ -15,7 +17,12 @@ SECONDS = {"1m": 60, "1h": 3600, "1d": 86400}
 CACHE_TTL = {"1m": 30, "1h": 300, "1d": 1800}
 # Yahoo needs a range big enough to cover `limit` candles for each interval
 YAHOO_RANGE = {"1m": "5d", "1h": "3mo", "1d": "2y"}
+log = logging.getLogger("atlas.candles")
 KLINES_URL = "https://data-api.binance.vision/api/v3/klines"
+# Short Yahoo ranges used to refresh the in-progress candle (with its real volume)
+YAHOO_REFRESH_RANGE = {"1m": "1d", "1h": "5d", "1d": "5d"}
+# How often the in-progress candle is re-read from the source, per asset type
+REFRESH_SECONDS = {"crypto": 5, "stock": 60}
 
 
 class Candle(BaseModel):
@@ -83,20 +90,84 @@ class CandleService:
                 self._live[key] = candles[-1].model_copy()
         return candles[-limit:]
 
-    async def _crypto(self, symbol: str, interval: str) -> list[Candle]:
+    async def _crypto(self, symbol: str, interval: str, limit: int = 1000) -> list[Candle]:
         try:
-            r = await self.http.get(KLINES_URL, params={"symbol": symbol, "interval": interval, "limit": 1000})
+            r = await self.http.get(KLINES_URL, params={"symbol": symbol, "interval": interval, "limit": limit})
         except httpx.HTTPError as exc:
             raise ApiError(502, f"Binance no responde: {exc}", "upstream_error") from exc
         if r.status_code != 200:
             raise ApiError(502, f"Binance respondió HTTP {r.status_code}", "upstream_error")
         return parse_klines(r.json())
 
-    async def _stock(self, symbol: str, interval: str) -> list[Candle]:
+    async def _stock(self, symbol: str, interval: str, range_: str | None = None) -> list[Candle]:
         try:
-            return parse_yahoo_candles(await self.yahoo.chart(symbol, interval, YAHOO_RANGE[interval]), SECONDS[interval])
+            payload = await self.yahoo.chart(symbol, interval, range_ or YAHOO_RANGE[interval])
+            return parse_yahoo_candles(payload, SECONDS[interval])
         except (YahooError, httpx.HTTPError) as exc:
             raise ApiError(502, str(exc), "upstream_error") from exc
+
+    def live(self, symbol: str, interval: str) -> Candle | None:
+        return self._live.get((symbol.upper(), interval))
+
+    async def ensure_live(self, symbol: str, interval: str) -> Candle | None:
+        """Make sure there is an in-progress candle for the pair (loads history if needed)."""
+        if (symbol.upper(), interval) not in self._live:
+            await self.history(symbol, interval, 1)
+        return self.live(symbol, interval)
+
+    async def refresh(self, symbol: str, interval: str) -> list[Candle]:
+        """Re-read the latest candles from the source, so volume and OHLC match it exactly.
+        Returns the candles that changed (to push to subscribers)."""
+        symbol = symbol.upper()
+        type_ = self.type_of(symbol)
+        if type_ is None:
+            return []
+        if (symbol, interval) not in self._live:
+            await self.history(symbol, interval, 1)
+            cur = self.live(symbol, interval)
+            return [cur] if cur else []
+        if type_ == "crypto":
+            recent = await self._crypto(symbol, interval, limit=2)
+        else:
+            recent = (await self._stock(symbol, interval, YAHOO_REFRESH_RANGE[interval]))[-2:]
+        key = (symbol, interval)
+        cur = self._live[key]
+        changed, closed = [], []
+        for c in recent:
+            if c.time < cur.time:
+                closed.append(c)  # already closed on our side: fix it in the cache, but don't push it
+                continue          # (Lightweight Charts' update() only accepts the last bar)
+            if c.time == cur.time:
+                # keep any extreme seen from the live quotes that the source hasn't caught up with yet
+                c = c.model_copy(update={"high": max(c.high, cur.high), "low": min(c.low, cur.low)})
+            changed.append(c)
+            cur = c
+        if changed:
+            self._live[key] = cur
+        if changed or closed:
+            hit = self._cache.get(key)
+            if hit:
+                by_time = {c.time: c for c in hit[1]}
+                by_time.update({c.time: c for c in closed + changed})
+                self._cache[key] = (hit[0], [by_time[t] for t in sorted(by_time)])
+        return changed
+
+    async def run_refresher(self, hub, tick: float = 5.0) -> None:
+        """Background loop: refresh the in-progress candle of every subscribed pair and push it."""
+        last: dict[tuple[str, str], float] = {}
+        while True:
+            now = self._clock()
+            for symbol, interval in hub.candle_subscriptions():
+                type_ = self.type_of(symbol)
+                if type_ is None or now - last.get((symbol, interval), -1e9) < REFRESH_SECONDS[type_]:
+                    continue
+                last[(symbol, interval)] = now
+                try:
+                    for c in await self.refresh(symbol, interval):
+                        await hub.broadcast_candle(symbol, interval, c.model_dump())
+                except Exception as exc:  # a failing source must not kill the loop
+                    log.warning("no se pudo refrescar la vela %s %s: %s", symbol, interval, exc)
+            await asyncio.sleep(tick)
 
     def apply_quote(self, quote: Quote, interval: str) -> Candle | None:
         """Fold a new price into the in-progress candle for (symbol, interval). Returns the updated candle."""

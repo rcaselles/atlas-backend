@@ -127,6 +127,7 @@ def test_candles_endpoint_and_websocket_push():
         with client.websocket_connect("/ws") as ws:
             ws.receive_json()
             ws.send_json({"type": "subscribe_candles", "data": {"symbol": "BTCUSDT", "interval": "1h"}})
+            assert ws.receive_json()["data"]["candle"]["time"] == last["time"]  # current candle on subscribe
             ws.send_json({"type": "ping"}); assert ws.receive_json()["type"] == "pong"
             client.portal.call(app.state.quotes.update, q(last["high"] + 1, last["time"] + 30))
             msgs = [ws.receive_json(), ws.receive_json()]
@@ -148,3 +149,73 @@ def test_yahoo_live_point_is_snapped_to_grid():
     r["timestamp"] = [1000, 4600, 4600 + 3600 + 77]  # live point opens a new candle
     snapped = parse_yahoo_candles(base, 3600)
     assert [c.time for c in snapped] == [1000, 4600, 8200]
+
+
+def test_refresh_brings_real_volume_and_new_candles():
+    calls = []
+    svc, _ = service(calls)
+    asyncio.run(svc.history("BTCUSDT", "1h"))
+    last = parse_klines(KLINES)[-1]
+    svc.apply_quote(q(last.high + 500, last.time + 10), "1h")  # live extreme not yet in the source
+    fresh = [list(KLINES[-1]), list(KLINES[-1])]
+    fresh[0][5] = "999.5"                       # same candle, updated volume
+    fresh[1][0] = KLINES[-1][0] + 3_600_000     # next candle just opened
+    fresh[1][5] = "1.25"
+    svc.http = httpx.AsyncClient(transport=httpx.MockTransport(lambda r: httpx.Response(200, json=fresh)))
+    changed = asyncio.run(svc.refresh("BTCUSDT", "1h"))
+    assert [c.time for c in changed] == [last.time, last.time + 3600]
+    assert changed[0].volume == 999.5 and changed[0].high == last.high + 500
+    assert svc.live("BTCUSDT", "1h").volume == 1.25
+    hist = asyncio.run(svc.history("BTCUSDT", "1h"))  # cache updated too
+    assert hist[-1].time == last.time + 3600 and hist[-2].volume == 999.5
+    # live price keeps the refreshed volume
+    assert svc.apply_quote(q(1.0, last.time + 3600 + 30), "1h").volume == 1.25
+
+
+def test_refresher_loop_pushes_to_subscribers():
+    svc, t = service([])
+    pushed = []
+
+    class FakeHub:
+        def candle_subscriptions(self):
+            return {("BTCUSDT", "1m"), ("AAPL", "1d"), ("ZZZ", "1h")}
+
+        async def broadcast_candle(self, symbol, interval, candle):
+            pushed.append((symbol, interval))
+
+    async def go():
+        task = asyncio.create_task(svc.run_refresher(FakeHub(), tick=0.01))
+        await asyncio.sleep(0.05)
+        task.cancel()
+
+    asyncio.run(go())
+    assert ("BTCUSDT", "1m") in pushed and ("AAPL", "1d") in pushed
+    assert pushed.count(("AAPL", "1d")) == 1  # stocks refresh at most once a minute (clock frozen)
+
+
+def test_subscribe_without_history_sends_current_candle():
+    with TestClient(app) as client:
+        http = httpx.AsyncClient(transport=transport([]))
+        app.state.candles = CandleService(http, YahooClient(http), app.state.candles.type_of)
+        with client.websocket_connect("/ws") as ws:
+            ws.receive_json()
+            ws.send_json({"type": "subscribe_candles", "data": {"symbol": "btcusdt", "interval": "1h"}})
+            msg = ws.receive_json()
+            assert msg["type"] == "candle" and msg["data"]["symbol"] == "BTCUSDT"
+            assert msg["data"]["candle"]["time"] == KLINES[-1][0] // 1000
+            assert msg["data"]["candle"]["volume"] == float(KLINES[-1][5])
+            ws.send_json({"type": "subscribe_candles", "data": {"symbol": "ZZZ", "interval": "1h"}})
+            err = ws.receive_json()
+            assert err["type"] == "error" and err["data"]["code"] == "not_found"
+
+
+def test_refresh_fixes_closed_candle_in_cache_without_pushing():
+    svc, _ = service([])
+    asyncio.run(svc.history("BTCUSDT", "1h"))
+    last = parse_klines(KLINES)[-1]
+    svc.apply_quote(q(5.0, last.time + 3600 + 1), "1h")  # a price already opened the next candle
+    closed = list(KLINES[-1]); closed[5] = "777.0"
+    svc.http = httpx.AsyncClient(transport=httpx.MockTransport(lambda r: httpx.Response(200, json=[closed])))
+    assert asyncio.run(svc.refresh("BTCUSDT", "1h")) == []
+    hist = asyncio.run(svc.history("BTCUSDT", "1h"))
+    assert hist[-1].time == last.time and hist[-1].volume == 777.0

@@ -41,7 +41,13 @@ def test_ping_pong_and_invalid_messages():
         assert ws.receive_json()["type"] == "error"
 
 
-def test_candle_messages_only_reach_subscribers():
+def test_candle_messages_only_reach_subscribers(monkeypatch):
+    from app.market.candles import CandleService
+
+    async def no_history(self, symbol, interval):
+        return None  # keep this test offline: no initial candle from Binance
+
+    monkeypatch.setattr(CandleService, "ensure_live", no_history)
     with TestClient(app) as client:
         with client.websocket_connect("/ws") as a, client.websocket_connect("/ws") as b:
             a.receive_json(); b.receive_json()

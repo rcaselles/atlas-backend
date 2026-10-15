@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -74,7 +75,9 @@ async def lifespan(app: FastAPI):
     app.state.quotes.subscribe_all(push_candles)
     app.state.binance = None
     app.state.stocks = None
+    app.state.candle_refresher = None
     if settings.market_streaming:
+        app.state.candle_refresher = asyncio.create_task(app.state.candles.run_refresher(app.state.hub))
         app.state.binance = BinanceStream(wl.symbols("crypto"), app.state.quotes, urls=settings.binance_url_list)
         app.state.binance.start()
         app.state.stocks = StockPoller(app.state.yahoo, app.state.quotes, wl.symbols("stock"), settings.stock_poll_seconds)
@@ -90,6 +93,8 @@ async def lifespan(app: FastAPI):
         app.state.news_aggregator = agg
         await agg.start()
     yield
+    if app.state.candle_refresher:
+        app.state.candle_refresher.cancel()
     if app.state.binance:
         await app.state.binance.stop()
     if app.state.stocks:

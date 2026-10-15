@@ -93,7 +93,8 @@ Devuelve la lista completa. `404` si no estaba.
 - `limit` va de 1 a 1000 (por defecto 300). En acciones puede haber menos velas de las pedidas: Yahoo da unos 5 días de velas de 1m, 3 meses de 1h y 2 años de 1d, y solo hay velas en horario de mercado.
 - Errores: `404 not_found` si el símbolo no está en la lista de seguimiento, `422 invalid_request` si el `interval` o el `limit` no son válidos, y `502 upstream_error` si Binance o Yahoo no responden.
 - El backend guarda el histórico en caché (30 s para 1m, 5 min para 1h, 30 min para 1d), así que se puede pedir sin miedo al cambiar de intervalo.
-- Para el tiempo real: primero se pide el histórico con este endpoint y después se envía `subscribe_candles` por el websocket. Cada mensaje `candle` trae la vela en curso actualizada (para `series.update()`) o, al cambiar de periodo, la vela nueva. En acciones llega una actualización por minuto, al ritmo de las cotizaciones.
+- Para el tiempo real: se pide el histórico con este endpoint y se envía `subscribe_candles` por el websocket. Nada más suscribirse llega un mensaje `candle` con la vela en curso, aunque nadie haya pedido el histórico antes (por ejemplo, tras reiniciar el backend). Si el símbolo no está en la lista, llega un `error` con `not_found`. Después, cada mensaje `candle` trae la vela en curso actualizada (para `series.update()`) o, al cambiar de periodo, la vela nueva.
+- Ritmo: el precio de la vela se mueve con cada cotización (cada segundo en cripto y cada minuto en acciones). El volumen y el OHLC se releen de la fuente cada 5 s en cripto y cada minuto en acciones. En acciones de 1m, Yahoo suele dar volumen 0 en el minuto en curso hasta que se cierra; el valor definitivo aparece al volver a pedir el histórico.
 
 ### Errores
 Siempre `{ "error": { "code": "not_found", "message": "texto legible" } }` con el código HTTP correspondiente. Códigos posibles: `not_found`, `invalid_request`, `invalid_cursor`, `conflict`, `upstream_error`.
