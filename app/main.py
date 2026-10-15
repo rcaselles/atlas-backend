@@ -1,6 +1,8 @@
 import logging
 from contextlib import asynccontextmanager
 
+import httpx
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -8,11 +10,15 @@ from app import errors
 from app.config import settings
 from app.market.binance import BinanceStream
 from app.market.quotes import QuoteStore
+from app.market.stocks import StockPoller
+from app.market.yahoo import YahooClient
 from app.news.aggregator import NewsAggregator, load_sources
 from app.news.router import router as news_router
 from app.news.store import NewsStore
 from app.realtime.hub import Hub
 from app.realtime.router import router as ws_router
+from app.watchlist.router import router as watchlist_router
+from app.watchlist.service import Validator, Watchlist, parse_default
 
 VERSION = "0.1.0"
 logging.basicConfig(level=logging.INFO)
@@ -35,11 +41,25 @@ async def lifespan(app: FastAPI):
         await app.state.hub.broadcast("price", quote.price_message())
 
     app.state.quotes.subscribe(push_price)
-    app.state.watchlist_snapshot = lambda: [q.model_dump(mode="json") for q in app.state.quotes.all()]
+    app.state.yahoo = YahooClient()
+    app.state.http = httpx.AsyncClient(timeout=10)
+    wl = Watchlist(settings.watchlist_file, parse_default(settings.default_watchlist), app.state.quotes,
+                   Validator(app.state.http, app.state.yahoo))
+    app.state.watchlist = wl
+    app.state.watchlist_snapshot = wl.snapshot
     app.state.binance = None
+    app.state.stocks = None
     if settings.market_streaming:
-        app.state.binance = BinanceStream(settings.crypto_symbol_list, app.state.quotes, urls=settings.binance_url_list)
+        app.state.binance = BinanceStream(wl.symbols("crypto"), app.state.quotes, urls=settings.binance_url_list)
         app.state.binance.start()
+        app.state.stocks = StockPoller(app.state.yahoo, app.state.quotes, wl.symbols("stock"), settings.stock_poll_seconds)
+        app.state.stocks.start()
+
+        def resubscribe(_items):
+            app.state.binance.set_symbols(wl.symbols("crypto"))
+            app.state.stocks.set_symbols(wl.symbols("stock"))
+
+        wl.on_change(resubscribe)
     if settings.news_polling:
         agg = NewsAggregator(load_sources(settings.news_sources_file), app.state.news_store)
         app.state.news_aggregator = agg
@@ -47,6 +67,10 @@ async def lifespan(app: FastAPI):
     yield
     if app.state.binance:
         await app.state.binance.stop()
+    if app.state.stocks:
+        await app.state.stocks.stop()
+    await app.state.yahoo.aclose()
+    await app.state.http.aclose()
     if app.state.news_aggregator:
         await app.state.news_aggregator.stop()
 
@@ -63,6 +87,7 @@ app.add_middleware(
 
 app.include_router(news_router)
 app.include_router(ws_router)
+app.include_router(watchlist_router)
 
 
 @app.get("/health")

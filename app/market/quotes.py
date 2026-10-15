@@ -19,6 +19,7 @@ class Quote(BaseModel):
     change_24h_pct: float
     updated_at: datetime
     delayed: bool = False
+    currency: str | None = None
 
     def price_message(self) -> dict:
         return self.model_dump(mode="json", include={"symbol", "price", "change_24h_pct", "updated_at", "delayed"})
@@ -42,6 +43,10 @@ class QuoteStore:
 
     def get(self, symbol: str) -> Quote | None:
         return self._quotes.get(symbol.upper())
+
+    def remove(self, symbol: str) -> None:
+        self._quotes.pop(symbol.upper(), None)
+        self._last_push.pop(symbol.upper(), None)
 
     def all(self) -> list[Quote]:
         return list(self._quotes.values())

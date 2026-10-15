@@ -1,0 +1,51 @@
+{
+ "chart": {
+  "result": [
+   {
+    "meta": {
+     "currency": "USD",
+     "symbol": "AAPL",
+     "exchangeName": "NMS",
+     "instrumentType": "EQUITY",
+     "regularMarketTime": 1792075185,
+     "regularMarketPrice": 344.63,
+     "chartPreviousClose": 342.96,
+     "shortName": "Apple Inc.",
+     "longName": "Apple Inc."
+    },
+    "timestamp": [
+     1792075185
+    ],
+    "indicators": {
+     "quote": [
+      {
+       "close": [
+        344.6299133300781
+       ],
+       "low": [
+        344.29998779296875
+       ],
+       "open": [
+        346.95001220703125
+       ],
+       "volume": [
+        10470387
+       ],
+       "high": [
+        347.8500061035156
+       ]
+      }
+     ],
+     "adjclose": [
+      {
+       "adjclose": [
+        344.6299133300781
+       ]
+      }
+     ]
+    }
+   }
+  ],
+  "error": null
+ }
+}

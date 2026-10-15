@@ -3,7 +3,7 @@
 Base URL local: `http://localhost:8000`. En producción, la URL pública del backend (tarea 7).
 Todas las fechas van en ISO 8601 UTC. Los timestamps de velas van en segundos Unix (formato de Lightweight Charts).
 
-Símbolos: cripto con el par de Binance (`BTCUSDT`), acciones con su ticker (`AAPL`). El campo `type` vale `crypto` o `stock`.
+Símbolos: cripto con el par de Binance (`BTCUSDT`), acciones con su ticker de Yahoo Finance (`AAPL`, o con sufijo de bolsa para otros mercados, como `SAN.MC` para Madrid). El campo `type` vale `crypto` o `stock`.
 
 ## REST
 
@@ -51,15 +51,16 @@ Estado de cada fuente de noticias, útil para un indicador en la interfaz.
       "price": 0.0,
       "change_24h_pct": 0.0,
       "updated_at": "2026-10-15T14:20:00Z",
-      "delayed": false
+      "delayed": false,
+      "currency": null
     }
   ]
 }
 ```
-`delayed: true` indica que la cotización viene con retraso (acciones gratuitas).
+`delayed: true` indica que la cotización viene con retraso (acciones gratuitas). `currency` viene en acciones (`USD`, `EUR`…) y es `null` en cripto, que cotiza en USDT. Justo después de arrancar o de añadir un símbolo, `price`, `change_24h_pct` y `updated_at` pueden venir a `null` hasta que llegue la primera cotización; luego llega un mensaje `price` por el websocket. La lista mantiene el orden en que se añadieron los símbolos.
 
 ### `POST /api/watchlist`
-Cuerpo: `{ "symbol": "ETHUSDT", "type": "crypto" }`. Devuelve la lista completa. `409` si ya existe, `422` si el símbolo no es válido.
+Cuerpo: `{ "symbol": "ETHUSDT", "type": "crypto" }`. El backend comprueba que el símbolo existe (en Binance o en Yahoo Finance) antes de añadirlo. Devuelve `201` con la lista completa, `409` si ya existe y `422` si el símbolo no existe o el `type` no es `crypto` ni `stock`.
 
 ### `DELETE /api/watchlist/{symbol}`
 Devuelve la lista completa. `404` si no estaba.
@@ -83,7 +84,7 @@ Siempre `{ "error": { "code": "not_found", "message": "texto legible" } }` con e
 
 El servidor empuja mensajes JSON con la forma `{ "type": "...", "data": { ... } }`.
 
-Estado actual: `snapshot`, `news`, `price` (cripto), `candle`, `ping` y las suscripciones ya funcionan. Hasta la tarea 4, la `watchlist` del snapshot contiene las cripto de `ATLAS_CRYPTO_SYMBOLS` que ya tengan precio; las acciones llegarán con esa tarea.
+Estado actual: `snapshot`, `news`, `price` (cripto cada segundo, acciones cada minuto), `candle`, `ping` y las suscripciones ya funcionan. La `watchlist` del snapshot tiene la misma forma que `GET /api/watchlist`.
 
 Al conectar, el servidor envía un `snapshot` con la lista de seguimiento y las últimas noticias:
 ```json
