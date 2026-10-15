@@ -23,7 +23,7 @@ Los activos se detectan por palabras clave en el título y el resumen. Además d
 ```
 
 ### `GET /api/news?limit=20&cursor=<id>&symbol=AAPL&type=stock&source=cnbc`
-Últimas noticias, de más nueva a más antigua. `cursor` es el `next_cursor` de la página anterior; Filtros opcionales y combinables: `symbol` (activo concreto), `type` (`crypto` o `stock`) y `source` (el `source_id` o el nombre de la fuente). `limit` va de 1 a 100. Un `cursor` que ya no existe devuelve `400` con código `invalid_cursor`; en ese caso, pide la primera página de nuevo.
+Últimas noticias, de más nueva a más antigua. `cursor` es el `next_cursor` de la página anterior. Filtros opcionales y combinables: `symbol` (activo concreto), `type` (`crypto` o `stock`) y `source` (el `source_id` o el nombre de la fuente). `limit` va de 1 a 100. Un `cursor` que ya no existe devuelve `400` con código `invalid_cursor`; en ese caso, pide la primera página de nuevo.
 ```json
 {
   "items": [
