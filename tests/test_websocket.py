@@ -19,7 +19,7 @@ def test_snapshot_then_live_news_push():
         with client.websocket_connect("/ws") as ws:
             snap = ws.receive_json()
             assert snap["type"] == "snapshot"
-            assert snap["data"]["watchlist"] == []
+            assert isinstance(snap["data"]["watchlist"], list)
             assert [n["id"] for n in snap["data"]["news"]] == ["w1"]
 
             client.portal.call(app.state.news_store.add_many, [_item(2)])

@@ -35,6 +35,15 @@ Las fuentes están en [config/sources.yaml](config/sources.yaml) y se cambian si
 - Si una fuente falla, las demás siguen funcionando. `GET /api/news/sources` muestra el estado de cada una.
 - Para trabajar sin conexión, pon `ATLAS_NEWS_POLLING=false`. Los tests nunca llaman a internet: usan respuestas grabadas en `tests/fixtures`.
 
+## Cotizaciones cripto
+
+Llegan en tiempo real por el websocket público de Binance (stream `miniTicker`, sin clave ni coste). Por defecto se usa `data-stream.binance.vision`, el endpoint de solo datos de mercado, que funciona desde más regiones, y `stream.binance.com` queda de respaldo.
+
+- Los símbolos se configuran con `ATLAS_CRYPTO_SYMBOLS` (por defecto BTC, ETH y SOL contra USDT).
+- Si se corta, reconecta solo con espera creciente de 1 a 60 segundos, y si el endpoint no responde prueba el siguiente.
+- El último precio y la variación de 24 h quedan en memoria para el resto del sistema, y se envían al front como mensajes `price`, como mucho uno por símbolo y segundo.
+- `ATLAS_MARKET_STREAMING=false` lo desactiva (los tests lo desactivan y usan mensajes simulados).
+
 ## Secretos
 
 Este repositorio es público. Toda la configuración va por variables de entorno (ver `.env.example`); nunca se suben claves.
