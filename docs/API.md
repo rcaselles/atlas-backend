@@ -83,6 +83,8 @@ Siempre `{ "error": { "code": "not_found", "message": "texto legible" } }` con e
 
 El servidor empuja mensajes JSON con la forma `{ "type": "...", "data": { ... } }`.
 
+Estado actual: `snapshot`, `news`, `candle`, `ping` y las suscripciones ya funcionan. Los mensajes `price` llegarán con la tarea 3, y hasta la tarea 4 la `watchlist` del snapshot viene vacía.
+
 Al conectar, el servidor envía un `snapshot` con la lista de seguimiento y las últimas noticias:
 ```json
 { "type": "snapshot", "data": { "watchlist": [ /* como GET /api/watchlist */ ], "news": [ /* como GET /api/news */ ] } }
@@ -109,6 +111,10 @@ Mensajes del cliente al servidor:
 { "type": "unsubscribe_candles", "data": { "symbol": "BTCUSDT", "interval": "1m" } }
 { "type": "ping" }
 ```
-El servidor responde a `ping` con `{ "type": "pong" }`. Si se corta la conexión, el cliente debe reconectar y recibirá un `snapshot` nuevo.
+El servidor responde a `ping` con `{ "type": "pong" }`. Un mensaje mal formado o desconocido recibe:
+```json
+{ "type": "error", "data": { "code": "invalid_message", "message": "texto legible" } }
+```
+La conexión sigue abierta tras un error. Si se corta la conexión, el cliente debe reconectar y recibirá un `snapshot` nuevo.
 
 Los precios de los ejemplos son marcadores (0.0), no datos reales.

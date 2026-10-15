@@ -9,6 +9,8 @@ from app.config import settings
 from app.news.aggregator import NewsAggregator, load_sources
 from app.news.router import router as news_router
 from app.news.store import NewsStore
+from app.realtime.hub import Hub
+from app.realtime.router import router as ws_router
 
 VERSION = "0.1.0"
 logging.basicConfig(level=logging.INFO)
@@ -18,6 +20,12 @@ logging.basicConfig(level=logging.INFO)
 async def lifespan(app: FastAPI):
     app.state.news_store = NewsStore(max_items=settings.news_max_items)
     app.state.news_aggregator = None
+    app.state.hub = Hub()
+
+    async def push_news(item):
+        await app.state.hub.broadcast("news", item.model_dump(mode="json"))
+
+    app.state.news_store.subscribe(push_news)
     if settings.news_polling:
         agg = NewsAggregator(load_sources(settings.news_sources_file), app.state.news_store)
         app.state.news_aggregator = agg
@@ -38,6 +46,7 @@ app.add_middleware(
 )
 
 app.include_router(news_router)
+app.include_router(ws_router)
 
 
 @app.get("/health")
