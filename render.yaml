@@ -1,0 +1,19 @@
+# Blueprint de Render (plan gratuito). Se crea con "New > Blueprint" apuntando a este repo.
+services:
+  - type: web
+    name: atlas-backend
+    runtime: python
+    plan: free
+    region: frankfurt
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.13.0"
+      - key: ATLAS_ENV
+        value: production
+      # URL del front en Vercel; se rellena en el panel de Render tras el primer despliegue del front
+      - key: ATLAS_CORS_ORIGINS
+        sync: false

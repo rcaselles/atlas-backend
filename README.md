@@ -53,6 +53,12 @@ Las acciones salen del endpoint público de gráficos de Yahoo Finance (`query1.
 - **Lista de seguimiento:** por defecto BTC, ETH, SOL, AAPL, MSFT, NVDA, TSLA y SAN.MC, configurable con `ATLAS_DEFAULT_WATCHLIST`. Se edita con `POST /api/watchlist` y `DELETE /api/watchlist/{symbol}`, se valida que el símbolo exista y se guarda en `ATLAS_WATCHLIST_FILE`. En un hosting gratuito ese archivo puede perderse al reiniciar, y entonces vuelve la lista por defecto.
 - Al cambiar la lista, Binance y el sondeo de acciones se actualizan solos, sin reiniciar el servidor.
 
+## Despliegue (Render, gratis)
+
+El repo trae `render.yaml`, así que en Render basta con crear un Blueprint apuntando a `rcaselles/atlas-backend`. Sale en el plan gratuito, en Frankfurt, comprueba `/health` y se redespliega con cada push a `main`. Solo hay que poner `ATLAS_CORS_ORIGINS` con la URL del front en Vercel.
+
+Limitaciones del plan gratuito: el servicio se duerme tras unos 15 minutos sin visitas y tarda unos segundos en despertar, y el disco no es persistente, así que los cambios en la lista de seguimiento se pierden al reiniciar y vuelve la lista por defecto (`ATLAS_DEFAULT_WATCHLIST`). Para la v0.1 lo damos por bueno.
+
 ## Secretos
 
 Este repositorio es público. Toda la configuración va por variables de entorno (ver `.env.example`); nunca se suben claves.
