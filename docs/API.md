@@ -13,7 +13,7 @@ Símbolos: cripto con el par de Binance (`BTCUSDT`), acciones con su ticker (`AA
 ```
 
 ### `GET /api/news?limit=20&cursor=<id>&symbol=AAPL`
-Últimas noticias, de más nueva a más antigua. `cursor` es el `next_cursor` de la página anterior; `symbol` filtra opcionalmente.
+Últimas noticias, de más nueva a más antigua. `cursor` es el `next_cursor` de la página anterior; `symbol` filtra opcionalmente. `limit` va de 1 a 100. Un `cursor` que ya no existe devuelve `400` con código `invalid_cursor`; en ese caso, pide la primera página de nuevo.
 ```json
 {
   "items": [
@@ -30,6 +30,15 @@ Símbolos: cripto con el par de Binance (`BTCUSDT`), acciones con su ticker (`AA
   "next_cursor": "b4dbeef9"
 }
 ```
+
+### `GET /api/news/sources`
+Estado de cada fuente de noticias, útil para un indicador en la interfaz.
+```json
+[
+  { "id": "cnbc", "name": "CNBC", "type": "rss", "ok": true, "last_run": "2026-10-15T14:20:00Z", "last_error": null, "items_last_run": 30 }
+]
+```
+`ok` es `null` si la fuente aún no se ha consultado.
 
 ### `GET /api/watchlist`
 ```json

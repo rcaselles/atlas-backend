@@ -1,0 +1,30 @@
+# Fuentes de noticias de Atlas. Se pueden añadir, quitar o desactivar sin tocar código.
+# type: rss (preferido) o html (scraping, solo si la web no tiene RSS).
+# interval: segundos entre sondeos (mínimo 60, por defecto 120).
+# Para html: list_url, item_selector, title_selector, link_selector y opcionalmente time_selector / summary_selector.
+sources:
+  - id: cnbc
+    name: CNBC
+    type: rss
+    url: https://www.cnbc.com/id/100003114/device/rss/rss.html
+    interval: 120
+  - id: marketwatch
+    name: MarketWatch
+    type: rss
+    url: https://feeds.content.dowjones.io/public/rss/mw_topstories
+    interval: 120
+  - id: investing
+    name: Investing.com
+    type: rss
+    url: https://www.investing.com/rss/news.rss
+    interval: 180
+  - id: cointelegraph
+    name: Cointelegraph
+    type: rss
+    url: https://cointelegraph.com/rss
+    interval: 120
+  - id: expansion
+    name: Expansión Mercados
+    type: rss
+    url: https://e00-expansion.uecdn.es/rss/mercados.xml
+    interval: 180

@@ -7,6 +7,10 @@ class Settings(BaseSettings):
     env: str = "development"
     # Comma-separated list of allowed frontend origins
     cors_origins: str = "http://localhost:5173,http://localhost:3000"
+    # News aggregator
+    news_sources_file: str = "config/sources.yaml"
+    news_polling: bool = True
+    news_max_items: int = 1000
 
     @property
     def cors_origin_list(self) -> list[str]:
